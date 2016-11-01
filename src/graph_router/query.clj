@@ -1,22 +1,24 @@
 (ns graph-router.query
-	(:require [schema.core :as s]
-			  [graph-router.type :refer :all]))
+  (:require [schema.core :as s]
+            [graph-router.type :refer :all]))
+
+(def ^:dynamic *current-query* nil)
 
 (declare parse-weave
-		 parse-function
-		 parse-keyword
-		 parse-map
-		 parse
-		 attribute-schema
-		 function-schema
-		 weave-schema
-		 attribute-list-schema
-		 context-schema
-		 query-schema)
+         parse-function
+         parse-keyword
+         parse-map
+         parse
+         attribute-schema
+         function-schema
+         weave-schema
+         attribute-list-schema
+         context-schema
+         query-schema)
 
 (def attribute-schema
 	{:type (s/eq Attribute)
-	 :value s/Keyword 
+	 :value s/Keyword
 	 :args [s/Any]})
 
 (def function-schema
@@ -31,30 +33,30 @@
 
 (def attribute-list-schema
 	(s/conditional seq [(s/conditional #(= (:type %) Attribute)
-									   attribute-schema 
+									   attribute-schema
 
 									   #(= (:type %) Weave)
-									   weave-schema 
+									   weave-schema
 
 									   #(= (:type %) Context)
 									   (s/recursive #'context-schema))]))
 
 (def context-schema
 	{:type (s/eq Context)
-	 :value (s/if #(= (:type %) Attribute) 
-	 			  attribute-schema 
+	 :value (s/if #(= (:type %) Attribute)
+	 			  attribute-schema
 	 			  weave-schema)
 	 :attributes attribute-list-schema})
 
 (def query-schema
 	(s/conditional  #(= (:type %) Attribute)
-					attribute-schema 
+					attribute-schema
 
 					#(= (:type %) Function)
-					function-schema 
+					function-schema
 
 					#(= (:type %) Weave)
-					weave-schema 
+					weave-schema
 
 					#(= (:type %) Context)
 					context-schema
@@ -62,12 +64,12 @@
 					:else
 					attribute-list-schema))
 
-(defn- parse-weave 
+(defn- parse-weave
 	[fun]
 	(let [[value & args] (:args fun)]
 		(->Wea Weave (parse value) (map parse args))))
 
-(defn- parse-list 
+(defn- parse-list
 	[form]
 	(let [value (first form)
 		  fun (->Func Function value (rest form))]
@@ -81,25 +83,25 @@
 			  :else
 		  	  fun)))
 
-(defn- parse-keyword 
+(defn- parse-keyword
 	[form]
 	(->Func Attribute form '()))
 
-(defn- parse-map 
+(defn- parse-map
 	[form]
 	(let [[context & _] (keys form)]
 		(->Cont Context (parse context) (parse (get form context)))))
 
 (def validate
-	(memoize 
+	(memoize
 		(fn [schema-validator form]
 			(schema-validator (parse form)))))
 
-(def validator 
-	(memoize 
+(def validator
+	(memoize
 		#(s/validator %)))
 
-(defn parse 
+(defn parse
 	([form schema]
 		(validate (validator schema) form))
 	([form]
