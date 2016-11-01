@@ -1,4 +1,4 @@
-(defproject kixi/graph-router "0.1.8"
+(defproject kixi/graph-router "0.1.9-SNAPSHOT"
   :description "A Clojure library for declarative data fetching in derived graphs!"
   :url "http://github.com/MastodonC/graph-router"
   :license {:name "Eclipse Public License"
