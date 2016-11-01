@@ -18,44 +18,44 @@
             (recur value)))))
 
 (defn- get-context
-	[context-list attrib-key]
-	(first (filter (fn [context]
-				(= attrib-key (:value (context-attribute context))))
-			(:value context-list))))
+  [context-list attrib-key]
+  (first (filter (fn [context]
+                   (= attrib-key (:value (context-attribute context))))
+                 (:value context-list))))
 
 (defn- same-attribute?
-	[{av :value at :type} {bv :value bt :type}]
-	(and (= Attribute at bt)
-		 (= av bv)))
+  [{av :value at :type} {bv :value bt :type}]
+  (and (= Attribute at bt)
+       (= av bv)))
 
 (defn- same-type?
-	[a b]
-	(let [ca (context-attribute a)
-	      cb (context-attribute b)]
-		(if (and (some? ca)
-				 (some? cb))
-		    (same-attribute? ca cb))))
+  [a b]
+  (let [ca (context-attribute a)
+        cb (context-attribute b)]
+    (if (and (some? ca)
+             (some? cb))
+      (same-attribute? ca cb))))
 
 (defn- find-match
-	[attrib-list needle]
-	(->> attrib-list
-		(reduce
-			(fn [ret attrib]
-				(cond ret
-					  ret
+  [attrib-list needle]
+  (->> attrib-list
+       (reduce
+        (fn [ret attrib]
+          (cond ret
+                ret
 
-					  (= ContextList (:type attrib))
-					  (let [match (find-match (:value attrib) needle)]
-					  	(if match
-					  		match
-					  		ret))
+                (= ContextList (:type attrib))
+                (let [match (find-match (:value attrib) needle)]
+                  (if match
+                    match
+                    ret))
 
-					  (same-type? attrib needle)
-					  attrib
+                (same-type? attrib needle)
+                attrib
 
-					  :else
-					  ret))
-				nil)))
+                :else
+                ret))
+        nil)))
 
 (defn- find-function
 	[function-list sym]
@@ -77,8 +77,8 @@
 			(reduce merge))))
 
 (defmulti ^:private step
-	(fn [graph _ _]
-		(:type graph)))
+  (fn [graph _ _]
+    (:type graph)))
 
 (defmethod step Weave
 	[graph query entities]
@@ -90,34 +90,38 @@
 		 	entities (:functions query))))
 
 (defmethod step Attribute
-	[graph query entity]
-	(let [f (:fn graph)
-		  args (:args query)]
-		(apply f (cons entity args))))
+  [graph query entity]
+  (let [f    (:fn graph)
+        args (:args query)
+        frag (:fragment query)]
+    (binding [qu/*current-query* frag]
+      (apply f (cons entity args)))))
 
 (defmethod step Recursive
-	[graph query entity]
-	(gr/parse (deref (:value graph)) gr/attribute-list-schema))
+  [graph query entity]
+  (gr/parse (deref (:value graph)) gr/attribute-list-schema))
 
 (defmethod step Context
-	[graph query entity]
-	(let [es (step (context-attribute graph)
-				  (context-attribute query)
-				  entity)
-		  g-attrib (:attributes graph)
-		  g-list (if (= Recursive (:type g-attrib))
-		  			 (step g-attrib query entity)
-		  			 g-attrib)
-		  process (process-attribs-fn g-list (:attributes query))
-		  gvalue (:value graph)
-		  qvalue (:value query)
-		  ; will be able to change to follow the query only once analyzer is written
-		  es (if (= Weave (:type gvalue) (:type qvalue))
-		  		 (step gvalue qvalue es)
-		  		 es)]
-		(if ((some-fn sequential? set?) es)
-			(vec (map process es))
-			(process es))))
+  [graph query entity]
+  (let [es (step (context-attribute graph)
+                 (assoc (context-attribute query)
+                        :fragment
+                        (mapv :value (:attributes query)))
+                 entity)
+        g-attrib (:attributes graph)
+        g-list (if (= Recursive (:type g-attrib))
+                 (step g-attrib query entity)
+                 g-attrib)
+        process (process-attribs-fn g-list (:attributes query))
+        gvalue (:value graph)
+        qvalue (:value query)
+                                        ; will be able to change to follow the query only once analyzer is written
+        es (if (= Weave (:type gvalue) (:type qvalue))
+             (step gvalue qvalue es)
+             es)]
+    (if ((some-fn sequential? set?) es)
+      (vec (map process es))
+      (process es))))
 
 (defmethod step ContextList
 	[graph query entity]
@@ -125,9 +129,9 @@
 		{attrib-key (step (get-context graph attrib-key) query entity)}))
 
 (defn dispatch
-	"Process a graph description with a query.
+  "Process a graph description with a query.
 	See https://github.com/LockedOn/graph-router for more information."
-	[graph query & [entity]]
-	(step (gr/parse graph gr/context-list-schema)
-		  (qu/parse query qu/context-schema)
-		  entity))
+  [graph query & [entity]]
+  (step (gr/parse graph gr/context-list-schema)
+        (qu/parse query qu/context-schema)
+        entity))
